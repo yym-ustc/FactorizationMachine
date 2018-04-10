@@ -1,0 +1,150 @@
+Table of Contents
+=================
+
+- What is LIBFM
+- Installation
+- Data Format
+- Command Line Usage
+- Examples
+- OpenMP and SSE
+- Building Windows Binaries
+- FAQ
+
+
+What is LIBFM
+==============
+
+This implementation of factorization machine is based on LibFFM(by Quqin Ruan). We update the data structure of the model parameters, and the new structure support several optimization methods well(Adagrad, FTRL, etc.).
+
+Installation
+============
+
+Requirement: It requires a C++11 compatible compiler. We also use OpenMP to provide multi-threading. If OpenMP is not
+available on your platform, please refer to section `OpenMP and SSE.'
+
+- Unix-like systems:
+  Typeype `make' in the command line.
+
+- Windows:
+  See `Building Windows Binaries' to compile.
+
+
+
+Data Format
+===========
+
+The data format of LIBFM is:
+
+<label> <feature1>:<value1> <feature2>:<value2> ...
+
+`feature' should be non-negative integers.
+
+
+Command Line Usage
+==================
+
+-   `fm-train'
+
+    usage: fm-train [options] training_set_file [model_file]
+
+    options:
+    -l <lambda>: set regularization parameter (default 0.00002)
+    -k <factor>: set number of latent factors (default 4)
+    -t <iteration>: set number of iterations (default 15)
+    -r <eta>: set learning rate (default 0.2)
+    -s <nr_threads>: set number of threads (default 1)
+    -p <path>: set path to the validation set
+    --quiet: quiet model (no output)
+    --no-norm: disable instance-wise normalization
+    --auto-stop: stop at the iteration that achieves the best validation loss (must be used with -p)
+
+    By default we do instance-wise normalization. That is, we normalize the 2-norm of each instance to 1. You can use
+    `--no-norm' to disable this function.
+    
+    A binary file `training_set_file.bin' will be generated to store the data in binary format.
+
+-   `fm-predict'
+
+    usage: fm-predict test_file model_file output_file
+
+
+
+Examples
+========
+
+> ./fm-train -p validate_data train_data model
+
+train a model using the default parameters
+
+
+> ./fm-predict predict_data model predict_ans
+
+do prediction
+
+
+> ./fm-train -l 0.0001 -k 15 -t 30 -r 0.05 -s 4 --auto-stop -p validate_data train_data model
+
+train a model using the following parameters:
+
+    regularization cost = 0.0001
+    latent factors = 15
+    iterations = 30
+    learning rate = 0.3
+    threads = 4
+    let it auto-stop
+
+
+OpenMP and SSE
+==============
+
+We use OpenMP to do parallelization. If OpenMP is not available on your
+platform, then please comment out the following lines in Makefile.
+
+    DFLAG += -DUSEOMP
+    CXXFLAGS += -fopenmp
+
+Note: Please run `make clean all' if these flags are changed.
+
+We use SSE instructions to perform fast computation. If you do not want to use it, comment out the following line:
+
+    DFLAG += -DUSESSE
+
+Then, run `make clean all'
+
+
+
+Building Windows Binaries
+=========================
+
+The Windows part is maintained by different maintainer, so it may not always support the latest version.
+
+The latest version it supports is: v1.21
+
+To build them via command-line tools of Visual C++, use the following steps:
+
+1. Open a DOS command box (or Developer Command Prompt for Visual Studio) and go to LIBFFM directory. If environment
+variables of VC++ have not been set, type
+
+"C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\amd64\vcvars64.bat"
+
+You may have to modify the above command according which version of VC++ or
+where it is installed.
+
+2. Type
+
+nmake -f Makefile.win clean all
+
+
+FAQ
+===
+
+Q: Why I have the same model size when k = 1 and k = 4?
+
+A: This is because we use SSE instructions. In order to use SSE, the memory need to be aligned. So even you assign k =
+   1, we still fill some dummy zeros from k = 2 to 4.
+
+
+Q: Why the logloss is slightly different on the same data when I run the program two or more times when I use multi-threading
+
+A: When there are more then one thread, the program becomes non-deterministic. To make it determinisitc you can only use one thread.
+
