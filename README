@@ -146,5 +146,5 @@ A: This is because we use SSE instructions. In order to use SSE, the memory need
 
 Q: Why the logloss is slightly different on the same data when I run the program two or more times when I use multi-threading
 
-A: When there are more then one thread, the program becomes non-deterministic. To make it determinisitc you can only use one thread.
+A: When there are more then one thread, the program becomes non-deterministic. To make it deterministic you can only use one thread.
 
