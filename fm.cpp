@@ -78,7 +78,7 @@ inline fm_float wTx(
             // weight w0
             fm_float w0_grad = kappa + lambda * model.w0;
             model.w0_a += w0_grad * w0_grad;
-            model.w0 -= eta * w0_grad; 
+            model.w0 -= eta / sqrt(model.w0_a) * w0_grad;
             // weight wi
             fm_weight_unit &unit1 = model.weight_map.find(idx1)->second; // weight unit of the feature 
             fm_float w_grad = kappa * value1 + lambda * unit1.w;
