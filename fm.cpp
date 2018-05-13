@@ -1,4 +1,3 @@
-
 #pragma GCC diagnostic ignored "-Wunused-result" 
 #include <algorithm>
 #include <cmath>
@@ -61,7 +60,6 @@ double gaussian(double mean, double stdev) {
 inline fm_float wTx(
     fm_node *begin,
     fm_node *end,
-    fm_float r,
     fm_model &model, 
     fm_float kappa=0, 
     fm_float eta=0, 
@@ -70,15 +68,15 @@ inline fm_float wTx(
 
     fm_float res = 0;
     if (do_update) {
+        // weight w0
+        fm_float w0_grad = kappa + lambda * model.w0;
+        model.w0_a += w0_grad * w0_grad;
+        model.w0 -= eta / sqrt(model.w0_a) * w0_grad;
         for (fm_node *node1 = begin; node1 != end; node1++) { // one feature in a sample
             fm_int idx1 = node1->idx;
             fm_float value1 = node1->value;
             if (idx1 >= model.n)
                 continue;
-            // weight w0
-            fm_float w0_grad = kappa + lambda * model.w0;
-            model.w0_a += w0_grad * w0_grad;
-            model.w0 -= eta / sqrt(model.w0_a) * w0_grad;
             // weight wi
             fm_weight_unit &unit1 = model.weight_map.find(idx1)->second; // weight unit of the feature 
             fm_float w_grad = kappa * value1 + lambda * unit1.w;
@@ -133,7 +131,6 @@ fm_model init_model(fm_int n, fm_parameter param) {
     model.n = n;
     model.k = param.k;
     model.weight_map.clear();
-    model.normalization = param.normalization;
     model.w0 = 0;
     model.w0_a = 1;
 
@@ -167,7 +164,6 @@ struct disk_problem_meta {
 struct problem_on_disk {
     disk_problem_meta meta;
     vector<fm_float> Y;
-    vector<fm_float> R;
     vector<fm_long> P;
     vector<fm_node> X;
     vector<fm_long> B;
@@ -193,9 +189,6 @@ struct problem_on_disk {
 
         Y.resize(l);
         f.read(reinterpret_cast<char*>(Y.data()), sizeof(fm_float) * l);
-
-        R.resize(l);
-        f.read(reinterpret_cast<char*>(R.data()), sizeof(fm_float) * l);
 
         P.resize(l+1);
         f.read(reinterpret_cast<char*>(P.data()), sizeof(fm_long) * (l+1));
@@ -263,7 +256,6 @@ void txt2bin(string txt_path, string bin_path) {
     disk_problem_meta meta;
 
     vector<fm_float> Y;
-    vector<fm_float> R;
     vector<fm_long> P(1, 0);
     vector<fm_node> X;
     vector<fm_long> B;
@@ -276,12 +268,10 @@ void txt2bin(string txt_path, string bin_path) {
 
         f_bin.write(reinterpret_cast<char*>(&l), sizeof(fm_int));
         f_bin.write(reinterpret_cast<char*>(Y.data()), sizeof(fm_float) * l);
-        f_bin.write(reinterpret_cast<char*>(R.data()), sizeof(fm_float) * l);
         f_bin.write(reinterpret_cast<char*>(P.data()), sizeof(fm_long) * (l+1));
         f_bin.write(reinterpret_cast<char*>(X.data()), sizeof(fm_node) * nnz);
 
         Y.clear();
-        R.clear();
         P.assign(1, 0);
         X.clear();
         p = 0;
@@ -295,7 +285,6 @@ void txt2bin(string txt_path, string bin_path) {
 
         fm_float y = (atoi(y_char)>0)? 1.0f : -1.0f;
 
-        fm_float scale = 0;
         for (; ; p++) {
             char *idx_char = strtok(nullptr,":");
             char *value_char = strtok(nullptr," \t");
@@ -310,13 +299,9 @@ void txt2bin(string txt_path, string bin_path) {
             X.push_back(N);
 
             meta.n = max(meta.n, N.idx+1);
-
-            scale += N.value * N.value;
         }
-        scale = 1.0 / scale;
 
         Y.push_back(y);
-        R.push_back(scale);
         P.push_back(p);
 
         if (X.size() > (size_t)kCHUNK_SIZE)
@@ -371,7 +356,7 @@ void fm_read_problem_to_disk(string txt_path, string bin_path) {
     }
 }
 
-fm_model fm_train_on_disk(string tr_path, string va_path, fm_parameter param) {
+fm_model fm_train_on_disk(string tr_path, string va_path, fm_parameter param, string model_path) {
 
     problem_on_disk tr(tr_path);
     problem_on_disk va(va_path);
@@ -422,9 +407,7 @@ fm_model fm_train_on_disk(string tr_path, string va_path, fm_parameter param) {
 
                 fm_node *end = &prob.X[prob.P[i+1]];
 
-                fm_float r = param.normalization? prob.R[i] : 1;
-
-                fm_double t = wTx(begin, end, r, model);
+                fm_double t = wTx(begin, end, model);
 
                 fm_double expnyt = exp(-y*t);
 
@@ -433,7 +416,7 @@ fm_model fm_train_on_disk(string tr_path, string va_path, fm_parameter param) {
                 if(do_update) {
                    
                     fm_float kappa = -y*expnyt/(1+expnyt);
-                    wTx(begin, end, r, model, kappa, param.eta, param.lambda, true);
+                    wTx(begin, end, model, kappa, param.eta, param.lambda, true);
                 }
             }
         }
@@ -468,6 +451,7 @@ fm_model fm_train_on_disk(string tr_path, string va_path, fm_parameter param) {
         }
         cout.width(13);
         cout << fixed << setprecision(1) << timer.get() << endl;
+        fm_save_model(model, model_path + "_" + std::to_string(iter));
     }
 
     return model;
@@ -481,7 +465,6 @@ fm_int fm_save_model(fm_model &model, string path) {
 
     f_out << "n " << model.n << "\n";
     f_out << "k " << model.k << "\n";
-    f_out << "normalization " << model.normalization << "\n";
     f_out << "bias " << model.w0 << "\n";
 
     for (fm_int i = 0; i < model.n; i++) {
@@ -507,8 +490,7 @@ fm_model fm_load_model(string path) {
     fm_model model;
 
     f_in >> dummy >> model.n
-         >> dummy >> model.k 
-         >> dummy >> model.normalization
+         >> dummy >> model.k
          >> dummy >> model.w0;
 
     for (fm_int i = 0; i < model.n; i++) {
@@ -533,14 +515,7 @@ fm_model fm_load_model(string path) {
 }
 
 fm_float fm_predict(fm_node *begin, fm_node *end, fm_model &model) {
-    fm_float r = 1;
-    if (model.normalization) {
-        r = 0;
-        for(fm_node *N = begin; N != end; N++)
-            r += N->value * N->value; 
-        r = 1 / r;
-    }
-    fm_float t = wTx(begin, end, r, model);
+    fm_float t = wTx(begin, end, model);
     return 1 / (1 + exp(-t));
 }
 

@@ -29,7 +29,6 @@ string train_help() {
 "-s <nr_threads>: set number of threads (default 1)\n"
 "-p <path>: set path to the validation set\n"
 "--quiet: quiet mode (no output)\n"
-"--no-norm: disable instance-wise normalization\n"
 "--auto-stop: stop at the iteration that achieves the best validation loss (must be used with -p)\n");
 }
 
@@ -110,8 +109,6 @@ Option parse_option(int argc, char **argv) {
                 throw invalid_argument("need to specify path after -p");
             i++;
             opt.va_path = args[i];
-        } else if (args[i].compare("--no-norm") == 0) {
-            opt.param.normalization = false;
         } else if (args[i].compare("--quiet") == 0) {
             opt.quiet = true;
         } else if (args[i].compare("--auto-stop") == 0) {
@@ -145,7 +142,7 @@ int train_on_disk(Option opt) {
     if (!opt.va_path.empty())
         fm_read_problem_to_disk(opt.va_path, va_bin_path);
 
-    fm_model model = fm_train_on_disk(tr_bin_path.c_str(), va_bin_path.c_str(), opt.param);
+    fm_model model = fm_train_on_disk(tr_bin_path.c_str(), va_bin_path.c_str(), opt.param, opt.model_path);
 
     fm_save_model(model, opt.model_path);
 

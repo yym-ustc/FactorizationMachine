@@ -24,10 +24,10 @@ struct fm_weight_unit{
     vector<fm_double> v; // weight v
     vector<fm_double> v_a; // auxiliary parameter for weight v
 };
+
 struct fm_model {
     fm_int n; // number of features
     fm_int k; // number of latent factors
-    bool normalization;
     unordered_map<fm_int, fm_weight_unit> weight_map;
     fm_float w0;
     fm_float w0_a;
@@ -40,7 +40,6 @@ struct fm_parameter {
     fm_float lambda = 0.00002; // regularization parameter
     fm_int nr_iters = 15;
     fm_int k = 4; // number of latent factors
-    bool normalization = true;
     bool auto_stop = false;
 };
 
@@ -50,7 +49,7 @@ fm_int fm_save_model(fm_model &model, string path);
 
 fm_model fm_load_model(string path);
 
-fm_model fm_train_on_disk(string Tr_path, string Va_path, fm_parameter param);
+fm_model fm_train_on_disk(string Tr_path, string Va_path, fm_parameter param, string model_path);
 
 fm_float fm_predict(fm_node *begin, fm_node *end, fm_model &model);
 
