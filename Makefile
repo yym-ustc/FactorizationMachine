@@ -1,4 +1,4 @@
-CXX = /home/xiaoju/user/yangyiming/gcc-release-4.8.5/bin/g++
+CXX = /specific_path/gcc-release-4.8.5/bin/g++
 CXXFLAGS = -Wall -O3 -std=c++0x -march=corei7-avx
 
 # comment the following flags if you do not want to use OpenMP
